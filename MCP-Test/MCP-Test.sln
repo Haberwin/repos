@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27703.2042
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MCP-Test", "RTC-Test\MCP-Test.csproj", "{AFD3BE9B-2BFD-4C66-BEC3-38A0E1D21A15}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MCP-Test", "MCP-Test\MCP-Test.csproj", "{AFD3BE9B-2BFD-4C66-BEC3-38A0E1D21A15}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

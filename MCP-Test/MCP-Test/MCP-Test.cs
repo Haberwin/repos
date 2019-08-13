@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Drawing;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using NationalInstruments.VisaNS;
-using System.IO;
-using System.Text;
 using System.Collections.Generic;
-using System.Collections;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace MCP_Test
 {
@@ -27,6 +24,7 @@ namespace MCP_Test
         private List<float> yVoltage = new List<float>();
         private bool connectStatus=false;
         private string Device_Address;
+        private int Vi = 0;
         private Thread measure;
         public MCP_Form()
         {
@@ -39,7 +37,8 @@ namespace MCP_Test
 
         private void Button_scan_Click(object sender, EventArgs e)
         {
-            Scan_Devices();
+             Scan_Devices();
+            //EnterRemot("GPIB0::5::INSTR");
         }
 
         /// <summary>
@@ -85,7 +84,7 @@ namespace MCP_Test
                 MessageBox.Show("GPIB Device Not Found!");
             }
                
-            catch (Exception visaExp)
+            catch (VisaException visaExp)
             {
                 MessageBox.Show(visaExp.Message);
             } 
@@ -143,8 +142,10 @@ namespace MCP_Test
             connectStatus = false;
             try
             {
-                mbSession = (MessageBasedSession)ResourceManager.GetLocalManager().Open(Device_address);
                 Device_Address = PowerSupply.Text;
+                mbSession = (MessageBasedSession)ResourceManager.GetLocalManager().Open(Device_address);
+                //EnterRemot(Device_Address);
+                
             }
             catch (InvalidCastException)
             {
@@ -163,6 +164,8 @@ namespace MCP_Test
                 Device_Info.Text = InsertCommonEscapeSequences(responseString);
                 //Print_Log("Find device:" + responseString);
                 connectStatus = true;
+                
+                //mbSession.Write(ReplaceCommonEscapeSequences("SYST:REM\\n"));
                 return;
             }
             catch (Exception exp)
@@ -229,11 +232,13 @@ namespace MCP_Test
 
         private void MCP_Form_FormClosing(object sender, FormClosingEventArgs e)
         {
+            
             if (measure != null && measure.IsAlive)
             {
                 try
                 {
                     measure.Abort();
+                    
                 }
                 catch (ThreadAbortException)
                 {
@@ -242,6 +247,7 @@ namespace MCP_Test
                 finally
                 {
                     measure.Join();
+                    Visa32.viClose(Vi);
                 }
             }
            
@@ -344,7 +350,7 @@ namespace MCP_Test
       */
         private void MCP_Form_Shown(object sender, EventArgs e)
         {
-            Scan_Devices();
+            //Scan_Devices();
             limitCurrent = Current.Value;
             limitVoltage = Voltage.Value;
             testCycle = decimal.ToInt16(Cycles.Value);
@@ -402,6 +408,7 @@ namespace MCP_Test
             }
             mbSession.Write(ReplaceCommonEscapeSequences("*RST\\n"));
             mbSession.Write(ReplaceCommonEscapeSequences("*CLS\\n"));
+           // mbSession.Write(ReplaceCommonEscapeSequences("SYST:REM\\n"));
             mbSession.Write(ReplaceCommonEscapeSequences(String.Format("VOLT {0}\\n",limitVoltage)));
             mbSession.Write(ReplaceCommonEscapeSequences(String.Format("CURR {0}\\n", limitCurrent)));
             //mbSession.Write(ReplaceCommonEscapeSequences(String.Format("OUTP 1\\n", limitCurrent)));
@@ -474,6 +481,14 @@ namespace MCP_Test
                 MessageBox.Show("无法获取到电流电压的返回值！");
                 return;
             }
+            catch (Exception exp)
+            {
+                timer_Test.Stop();
+                MessageBox.Show("通讯故障："+exp.Message);
+                
+                return;
+
+            }
             
             //stepTime,new Random().Next(0, 4));
             yVoltage.Add(VolNow);
@@ -533,67 +548,125 @@ namespace MCP_Test
         {
             testCycle = decimal.ToInt16(Cycles.Value);
         }
+
+
+
         /*
-        private void Current_TextChanged(object sender, EventArgs e)
-        {
-            string Jugged = "Fail";
-            if (Current.Text.Equals("0.00"))
-            {
-                return;
-            }
-            try
-            {
-                if (float.Parse(Current.Text) <= 3.4 && float.Parse(Current.Text) >= 2.5)
-                {
-                    Jugged = "Pass";
-                }
-                else
-                {
-                    Jugged = "Fail";
-                    Current.BackColor = Color.OrangeRed;
-                    return;
-                }
-            }
-            catch (Exception)
-            {
-                Current.BackColor = Color.OrangeRed;
-                return;
-            }
-            
-            
-            //byte[] SN = Encoding.ASCII.GetBytes(String.Format("{0}\0",SN_Code));
-            byte[] Current_Value = Encoding.ASCII.GetBytes(String.Format("{0}\0", Current.Text));
-            byte[] Juged_Value= Encoding.ASCII.GetBytes(String.Format("{0}\0", Jugged));
-            try
-            {
-                //string msg = String.Format("Barcode ={0},Voltage ={1},Result ={2}", SN_Code, Current.Text, Jugged);
-                string filename = String.Format("log/MCP-Log-{0:yyyy-MM-dd}.txt", System.DateTime.Now);
-                FileStream fs;
-                if (File.Exists(filename))
-                {
-                     fs= new FileStream(filename, FileMode.Append, FileAccess.Write);
-                    
-                }
-                else
-                {
-                    fs = new FileStream(filename, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+private void Current_TextChanged(object sender, EventArgs e)
+{
+   string Jugged = "Fail";
+   if (Current.Text.Equals("0.00"))
+   {
+       return;
+   }
+   try
+   {
+       if (float.Parse(Current.Text) <= 3.4 && float.Parse(Current.Text) >= 2.5)
+       {
+           Jugged = "Pass";
+       }
+       else
+       {
+           Jugged = "Fail";
+           Current.BackColor = Color.OrangeRed;
+           return;
+       }
+   }
+   catch (Exception)
+   {
+       Current.BackColor = Color.OrangeRed;
+       return;
+   }
 
-                }
-                StreamWriter sw = new StreamWriter(fs); // 创建写入流
-                //sw.WriteLine(msg);
 
-                sw.Close(); //关闭文件
-            }
-            catch (Exception exp)
-            {
-                MessageBox.Show(exp.Message);
-            }
+   //byte[] SN = Encoding.ASCII.GetBytes(String.Format("{0}\0",SN_Code));
+   byte[] Current_Value = Encoding.ASCII.GetBytes(String.Format("{0}\0", Current.Text));
+   byte[] Juged_Value= Encoding.ASCII.GetBytes(String.Format("{0}\0", Jugged));
+   try
+   {
+       //string msg = String.Format("Barcode ={0},Voltage ={1},Result ={2}", SN_Code, Current.Text, Jugged);
+       string filename = String.Format("log/MCP-Log-{0:yyyy-MM-dd}.txt", System.DateTime.Now);
+       FileStream fs;
+       if (File.Exists(filename))
+       {
+            fs= new FileStream(filename, FileMode.Append, FileAccess.Write);
 
-        }
- */
-        
+       }
+       else
+       {
+           fs = new FileStream(filename, FileMode.OpenOrCreate, FileAccess.ReadWrite);
 
-    }
-    
+       }
+       StreamWriter sw = new StreamWriter(fs); // 创建写入流
+       //sw.WriteLine(msg);
+
+       sw.Close(); //关闭文件
+   }
+   catch (Exception exp)
+   {
+       MessageBox.Show(exp.Message);
+   }
 
 }
+
+
+
+
+        public bool EnterRemot(string gpib_address)
+        {
+            //CalibrationCurrent.Properties.Resources.cmd2
+            //ErrorStatus = -1;
+            
+            Visa32.viGetDefaultRM(out int defrm);
+            Thread.Sleep(200);
+
+                int ErrorStatus = Visa32.viOpen(defrm,  gpib_address, 1, 3000, out Vi);
+                if (ErrorStatus != 0)
+                {
+                MessageBox.Show("Fail");
+                    return false;
+                }
+            Visa32.viGpibControlREN(Vi, 0x5);
+            Visa32.viClose(Vi);
+            return true;
+        }
+        */
+        internal sealed class Visa32
+        {
+            // --------------------------------------------------------------------------------
+            //  Adapted from visa32.bas which was distributed by VXIplug&play Systems Alliance
+            //  Distributed By Agilent Technologies, Inc.
+            // --------------------------------------------------------------------------------
+            // -------------------------------------------------------------------------
+            public const int VI_SPEC_VERSION = 4194304;
+        #pragma warning disable IDE1006 // 命名样式
+            #region - Resource Template Functions and Operations ----------------------------
+            [DllImportAttribute("Visa32.dll", EntryPoint = "#141", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
+            public static extern int viOpenDefaultRM(out int sesn);
+            [DllImportAttribute("Visa32.dll", EntryPoint = "#128", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
+            public static extern int viGetDefaultRM(out int sesn);
+            [DllImportAttribute("Visa32.dll", EntryPoint = "#131", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
+            public static extern int viOpen(int sesn, string viDesc, int mode, int timeout, out int vi);
+            [DllImportAttribute("Visa32.dll", EntryPoint = "#132", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
+            public static extern int viClose(int vi);
+            [DllImportAttribute("Visa32.DLL", EntryPoint = "#146", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
+            public static extern int viParseRsrcEx(int sesn, string desc, ref short intfType, ref short intfNum, StringBuilder rsrcClass, StringBuilder expandedUnaliasedName, StringBuilder aliasIfExists);
+            [DllImportAttribute("Visa32.dll", EntryPoint = "#269", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true, CallingConvention = CallingConvention.Cdecl)]
+            public static extern int viPrintf(int vi, string writeFmt);
+            [DllImportAttribute("Visa32.dll", EntryPoint = "#271", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true, CallingConvention = CallingConvention.Cdecl)]
+            public static extern int viScanf(int vi, string readFmt, StringBuilder arg);
+            [DllImportAttribute("VISA32.DLL", EntryPoint = "#208", ExactSpelling = true, CharSet = CharSet.Ansi, SetLastError = true)]
+            public static extern int viGpibControlREN(int vi, short mode);
+
+            #endregion
+#pragma warning restore IDE1006 // 命名样式
+        }
+
+    }
+
+
+}
+
+    
+
+

@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // 控制。更改这些特性值可修改
 // 与程序集关联的信息。
 [assembly: AssemblyTitle("MCP-Test")]
-[assembly: AssemblyDescription("Maidu-For Memor10 MCP test")]
+[assembly: AssemblyDescription("Maidu MCP test")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Ningbo Maidu")]
 [assembly: AssemblyProduct("MCP-Test")]
